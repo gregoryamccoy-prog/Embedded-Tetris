@@ -20,6 +20,9 @@ void gameTask(void* pvParameters) {
     SimpleTimer inputTimer;
     inputTimer.start();
     
+    // Track if display needs update
+    bool needsDisplayUpdate = false;
+    
     // Game loop
     while (true) {
         // Poll input at regular intervals
@@ -38,6 +41,7 @@ void gameTask(void* pvParameters) {
                 } else if (gameState.status == GameStatus::PLAYING) {
                     // Redraw when unpausing
                     display.fullRedraw(gameState);
+                    needsDisplayUpdate = false;  // Already updated
                 }
             }
             
@@ -47,23 +51,29 @@ void gameTask(void* pvParameters) {
                 if (input.rotatePressed) {
                     if (rotatePieceLeft(gameState)) {
                         audioManager.enqueueSound(SoundEvent::SOUND_ROTATE);
+                        needsDisplayUpdate = true;
                     }
                 }
                 
                 // Move right
                 if (input.rightPressed) {
-                    movePieceRight(gameState);
+                    if (movePieceRight(gameState)) {
+                        needsDisplayUpdate = true;
+                    }
                 }
                 
                 // Move left
                 if (input.leftPressed) {
-                    movePieceLeft(gameState);
+                    if (movePieceLeft(gameState)) {
+                        needsDisplayUpdate = true;
+                    }
                 }
                 
                 // Hard drop
                 if (input.hardDropPressed) {
                     hardDrop(gameState);
                     audioManager.enqueueSound(SoundEvent::SOUND_PLACE);
+                    needsDisplayUpdate = true;
                     
                     // Check for line clears after drop
                     if (gameState.linesCleared > 0) {
@@ -94,6 +104,7 @@ void gameTask(void* pvParameters) {
             
             if (gravityTimer.expired(gravityInterval)) {
                 bool moved = stepGravity(gameState);
+                needsDisplayUpdate = true;
                 
                 if (!moved) {
                     // Piece was locked
@@ -124,12 +135,13 @@ void gameTask(void* pvParameters) {
             }
         }
         
-        // Update display
-        if (gameState.status == GameStatus::PLAYING) {
+        // Update display only when needed
+        if (gameState.status == GameStatus::PLAYING && needsDisplayUpdate) {
             display.drawPlayfield(gameState);
             display.drawCurrentPiece(gameState);
             display.drawNextPiece(gameState.nextPiece);
             display.drawStats(gameState.level, gameState.linesCleared, gameState.score);
+            needsDisplayUpdate = false;
         }
         
         // Small delay to prevent watchdog triggers

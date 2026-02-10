@@ -2,6 +2,10 @@
 
 Display::Display() : tft() {
     hasPrevPiece = false;
+    hasDrawnNextPiece = false;
+    prevLevel = -1;
+    prevLinesCleared = -1;
+    prevScore = 0;
     
     // Initialize previous field state
     for (int y = 0; y < PLAYFIELD_HEIGHT; y++) {
@@ -123,6 +127,13 @@ void Display::drawCurrentPiece(const GameState& state) {
 }
 
 void Display::drawNextPiece(const Tetromino& next) {
+    // Only redraw if the next piece changed
+    if (hasDrawnNextPiece && 
+        next.type == prevNextPieceType && 
+        next.rotation == prevNextPieceRotation) {
+        return;  // No change, skip redraw
+    }
+    
     // Clear next piece area
     int previewX = UI_PANEL_X;
     int previewY = UI_PANEL_Y;
@@ -151,26 +162,40 @@ void Display::drawNextPiece(const Tetromino& next) {
         
         tft.fillRect(px, py, NEXT_PIECE_CELL_SIZE - 1, NEXT_PIECE_CELL_SIZE - 1, next.color);
     }
+    
+    // Remember what we drew
+    prevNextPieceType = next.type;
+    prevNextPieceRotation = next.rotation;
+    hasDrawnNextPiece = true;
 }
 
 void Display::drawStats(int level, int linesCleared, unsigned long score) {
     tft.setTextColor(COLOR_WHITE, COLOR_BACKGROUND);
     tft.setTextSize(1);
     
-    // Level
-    tft.setCursor(UI_PANEL_X, UI_PANEL_Y + 75);
-    tft.fillRect(UI_PANEL_X, UI_PANEL_Y + 75, 60, 10, COLOR_BACKGROUND);
-    tft.print(level);
+    // Only update level if changed
+    if (level != prevLevel) {
+        tft.setCursor(UI_PANEL_X, UI_PANEL_Y + 75);
+        tft.fillRect(UI_PANEL_X, UI_PANEL_Y + 75, 60, 10, COLOR_BACKGROUND);
+        tft.print(level);
+        prevLevel = level;
+    }
     
-    // Lines
-    tft.setCursor(UI_PANEL_X, UI_PANEL_Y + 105);
-    tft.fillRect(UI_PANEL_X, UI_PANEL_Y + 105, 60, 10, COLOR_BACKGROUND);
-    tft.print(linesCleared);
+    // Only update lines if changed
+    if (linesCleared != prevLinesCleared) {
+        tft.setCursor(UI_PANEL_X, UI_PANEL_Y + 105);
+        tft.fillRect(UI_PANEL_X, UI_PANEL_Y + 105, 60, 10, COLOR_BACKGROUND);
+        tft.print(linesCleared);
+        prevLinesCleared = linesCleared;
+    }
     
-    // Score
-    tft.setCursor(UI_PANEL_X, UI_PANEL_Y + 135);
-    tft.fillRect(UI_PANEL_X, UI_PANEL_Y + 135, 60, 10, COLOR_BACKGROUND);
-    tft.print(score);
+    // Only update score if changed
+    if (score != prevScore) {
+        tft.setCursor(UI_PANEL_X, UI_PANEL_Y + 135);
+        tft.fillRect(UI_PANEL_X, UI_PANEL_Y + 135, 60, 10, COLOR_BACKGROUND);
+        tft.print(score);
+        prevScore = score;
+    }
 }
 
 void Display::drawPauseOverlay() {
@@ -217,6 +242,10 @@ void Display::fullRedraw(const GameState& state) {
         }
     }
     hasPrevPiece = false;
+    hasDrawnNextPiece = false;
+    prevLevel = -1;
+    prevLinesCleared = -1;
+    prevScore = 0;
     
     drawPlayfield(state);
     drawCurrentPiece(state);

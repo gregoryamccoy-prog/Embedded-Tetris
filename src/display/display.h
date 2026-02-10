@@ -17,6 +17,14 @@ private:
     int prevPieceY[4];
     bool hasPrevPiece;
     
+    // Track previous UI state
+    TetrominoType prevNextPieceType;
+    int prevNextPieceRotation;
+    bool hasDrawnNextPiece;
+    int prevLevel;
+    int prevLinesCleared;
+    unsigned long prevScore;
+    
     void drawCellAt(int x, int y, uint16_t color);
     void drawGridCell(int gridX, int gridY, uint16_t color);
     
