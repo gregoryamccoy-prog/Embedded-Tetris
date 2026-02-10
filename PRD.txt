@@ -1,0 +1,879 @@
+Project Requirements Document
+
+SKILL:  You are a skilled embedded system engineer.  You are knowledgeable in ESP32 Development and Graphics programming with the ILI9431 TFT LCD driver.
+
+Project: ESP32 Tetris Game (SPI TFT + I2S Sound)
+Target MCU: ESP32-WROOM (DevKit-style board, Arduino/PlatformIO)
+Display: 320×240 TFT LCD with ILI9341/ILI9431-compatible controller (SPI)
+Audio: MAX98357A I2S amplifier + 0.5W 8Ω 28mm speaker
+Input: 5 momentary push buttons
+Language/Framework: Arduino C++ (PlatformIO, VS Code)
+Connectivity: No Wi-Fi / Bluetooth; both cores available for app use.
+
+1. Hardware Overview & Wiring
+1.1 Power
+
+ESP32 board powered via USB 5 V.
+
+TFT, MAX98357A, buttons powered from 3.3 V rail from ESP32 where possible.
+
+Ensure total 3.3 V current draw stays within regulator specs; otherwise, external 3.3 V regulator.
+
+1.2 TFT LCD (ILI9341/ILI9431) — SPI
+
+Assumptions:
+
+320×240 pixels, SPI interface.
+
+Uses standard SPI lines + DC, CS, RESET, and optional backlight pin.
+
+Pin assignment (example; can be changed but must be consistent in code):
+
+Function	TFT Pin	ESP32 Pin (example)
+VCC	3.3 V	3V3
+GND	GND	GND
+SCK / CLK	SCK	GPIO18
+MOSI / SDA	MOSI	GPIO23
+MISO (if present)	MISO	GPIO19
+CS	CS	GPIO5
+D/C or RS	DC	GPIO2
+RESET	RST	GPIO4
+LED / BL	LED	3.3 V or GPIO15 via transistor (optional dimming)
+
+Notes:
+
+SPI will use VSPI (default: SCK=18, MISO=19, MOSI=23) for performance.
+
+Backlight can be tied to 3.3 V for always-on, or controlled by a GPIO for future dimming/sleep.
+
+1.3 MAX98357A I2S Amplifier + Speaker
+
+Assumptions:
+
+MAX98357A board using I2S input.
+
+Speaker: 0.5W, 8 Ω, 28mm.
+
+Pin assignment (example):
+
+Function	MAX98357A Pin	ESP32 Pin (example)
+VIN	5 V	5V from ESP32 USB
+GND	GND	GND
+LRC / LRCLK	LRC	GPIO25
+BCLK	BCLK	GPIO26
+DIN (Data In)	DIN	GPIO22
+SD / Gain pins	(as per board)	GND / tied as needed
+
+Notes:
+
+Use 5 V for MAX98357A VIN to get full output power.
+
+Speaker connected directly to speaker output terminals of MAX98357A.
+
+1.4 Buttons (5 × momentary)
+
+Functions:
+
+Button A: Pause / Resume Game
+
+Button B: Rotate (each push will rotate the piece to the left for all configurations)
+
+Button C: Translate piece right
+
+Button D: Translate piece left
+
+Button E: Hard drop (immediate descent) of current piece
+
+Electrical:
+
+All buttons wired active low:
+
+One side to GND.
+
+Other side to dedicated GPIO with internal pull-up enabled in software.
+
+Pin assignment (example):
+
+Function	Button	ESP32 Pin
+Pause	A	GPIO32
+Rotate	B	GPIO33
+Translate Right	C	GPIO27
+Translate Left	D	GPIO14
+Hard Drop (immediate)	E	GPIO13
+
+Debounce required in software.
+
+1.5 Complete Wiring Summary
+
+Below is a comprehensive pin assignment table for the entire project:
+
+╔═══════════════════════════════════════════════════════════════════════╗
+║                    ESP32 TETRIS WIRING DIAGRAM                        ║
+╠═══════════════════════════════════════════════════════════════════════╣
+║ COMPONENT         │ FUNCTION        │ ESP32 PIN    │ NOTES           ║
+╠═══════════════════════════════════════════════════════════════════════╣
+║ TFT DISPLAY (SPI) │                 │              │                 ║
+║                   │ VCC             │ 3.3V         │ Power           ║
+║                   │ GND             │ GND          │ Ground          ║
+║                   │ SCK/CLK         │ GPIO18       │ SPI Clock       ║
+║                   │ MOSI/SDA        │ GPIO23       │ SPI Data Out    ║
+║                   │ MISO            │ GPIO19       │ SPI Data In     ║
+║                   │ CS (Chip Sel)   │ GPIO5        │ Chip Select     ║
+║                   │ DC/RS           │ GPIO2        │ Data/Command    ║
+║                   │ RESET           │ GPIO4        │ Reset           ║
+║                   │ LED/BL          │ GPIO15       │ Backlight PWM   ║
+╠═══════════════════════════════════════════════════════════════════════╣
+║ AUDIO (I2S)       │                 │              │                 ║
+║ MAX98357A         │ VIN             │ 5V           │ Power (USB 5V)  ║
+║                   │ GND             │ GND          │ Ground          ║
+║                   │ BCLK            │ GPIO26       │ Bit Clock       ║
+║                   │ LRC/LRCLK       │ GPIO25       │ Left/Right Clk  ║
+║                   │ DIN             │ GPIO22       │ Data In         ║
+╠═══════════════════════════════════════════════════════════════════════╣
+║ BUTTONS           │                 │              │                 ║
+║ (Active Low)      │ Button A (Pause)│ GPIO32       │ INPUT_PULLUP    ║
+║                   │ Button B (Rot)  │ GPIO33       │ INPUT_PULLUP    ║
+║                   │ Button C (Right)│ GPIO27       │ INPUT_PULLUP    ║
+║                   │ Button D (Left) │ GPIO14       │ INPUT_PULLUP    ║
+║                   │ Button E (Drop) │ GPIO13       │ INPUT_PULLUP    ║
+╚═══════════════════════════════════════════════════════════════════════╝
+
+Pin Usage Summary:
+- GPIO 2, 4, 5, 15, 18, 19, 23: TFT Display (7 pins)
+- GPIO 22, 25, 26: I2S Audio (3 pins)
+- GPIO 13, 14, 27, 32, 33: Buttons (5 pins)
+- Total: 15 GPIO pins used
+
+Notes:
+- All buttons wired active-low: one terminal to GND, other to GPIO
+- Internal pull-ups enabled in software for all button pins
+- SPI uses VSPI peripheral (default: SCK=18, MISO=19, MOSI=23)
+- I2S uses I2S0 peripheral
+- Backlight GPIO15 can be tied to 3.3V for always-on if PWM not needed
+
+2. Software Environment
+
+Platform: PlatformIO in VS Code.
+
+Board: esp32dev (or equivalent ESP32-WROOM dev board).
+
+Framework: Arduino.
+
+Example platformio.ini (for later codegen, not to be implemented now):
+
+platform = espressif32
+
+board = esp32dev
+
+framework = arduino
+
+monitor_speed = 115200
+
+lib_deps (libraries listed next section)
+
+3. Libraries & Dependencies
+
+Use these (or equivalent) Arduino libraries:
+
+Display & Graphics
+
+TFT_eSPI or Adafruit_ILI9341 + Adafruit_GFX
+
+PRD assumption: pick one and configure; TFT_eSPI is preferred for performance.
+
+Audio / I2S
+
+ESP32 Arduino I2S interface (built-in) for raw PCM sample output.
+
+No complex audio decoder needed; simple tone generation or small PCM sequences.
+
+Buttons / Debouncing
+
+Either custom debouncing or use Bounce2 library.
+
+RTOS / Multicore
+
+ESP32 FreeRTOS (included in ESP32 Arduino core).
+
+Use pinned tasks for graphics/game logic and audio.
+
+4. High-Level Architecture
+4.1 Core Responsibilities
+
+Core 1 (APP CPU)
+
+Main game logic (piece movement, collision, scoring, levels).
+
+Rendering to TFT display.
+
+Reading debounced button states (can be in this task or separate).
+
+Core 0 (PRO CPU)
+
+Audio/I2S playback task.
+
+Optional: Input task, if you want to isolate I/O timing.
+
+4.2 Tasks
+
+Game Task (core 1):
+
+Runs main game loop:
+
+Polls input state (or reads shared input flags).
+
+Advances game state according to gravity timer and player input.
+
+Detects line clears, level ups, and game over.
+
+Triggers sound events via a thread-safe audio command queue.
+
+Requests display updates.
+
+Display Task (core 1, can be part of Game Task or separate):
+
+Responsible for efficient drawing/updating:
+
+Redraw changed cells only.
+
+Draw next-piece preview.
+
+Draw score/level UI elements.
+
+Audio Task (core 0):
+
+Reads sound commands from a queue (e.g., “ROTATE_SOUND”, “LINE_CLEAR_SOUND”).
+
+Generates and streams audio samples to I2S.
+
+Ensures non-blocking behavior to avoid glitching.
+
+Input Task (optional, either core):
+
+Polls button GPIOs, performs debouncing.
+
+Updates a shared input state structure accessed by Game Task.
+
+5. File / Module Structure
+
+Desired project structure (under src/):
+
+src/main.cpp
+
+src/config.h
+
+src/hardware_pins.h
+
+src/display/display.h
+
+src/display/display.cpp
+
+src/game/game_state.h
+
+src/game/game_state.cpp
+
+src/game/tetromino.h
+
+src/game/tetromino.cpp
+
+src/game/input.h
+
+src/game/input.cpp
+
+src/audio/audio.h
+
+src/audio/audio.cpp
+
+src/system/tasks.h
+
+src/system/tasks.cpp
+
+src/util/timer.h
+
+src/util/timer.cpp
+
+5.1 Module Responsibilities
+
+main.cpp
+
+Entry point: setup() and loop().
+
+Initializes hardware (display, audio, buttons).
+
+Creates FreeRTOS tasks (game, audio, input, etc.).
+
+loop() may be empty or used only for watchdog/monitoring.
+
+config.h
+
+Global configuration constants:
+
+Game field size.
+
+Initial gravity speed.
+
+Rows-per-level (20).
+
+Colors, tile size, margins.
+
+Audio sample rate and buffer sizes.
+
+hardware_pins.h
+
+All GPIO assignments in one place matching the wiring diagram.
+
+Macros or constexpr int for:
+
+TFT: CS, DC, RST, BL.
+
+SPI pins if needed.
+
+Buttons: PAUSE, ROTATE, RIGHT, LEFT, HARD_DROP.
+
+I2S: BCLK, LRCLK, DATA.
+
+display/display.h/.cpp
+
+Wraps TFT library.
+
+Provides functions:
+
+void displayInit();
+
+void clearScreen();
+
+void drawPlayfield(const GameState& state);
+
+void drawCell(int x, int y, uint16_t color);
+
+void drawNextPiece(const Tetromino& next);
+
+void drawStats(int level, int linesCleared);
+
+void drawPauseOverlay();
+
+void drawGameOver();
+
+Handles coordinate mapping from game grid (10x20) to pixels.
+
+Uses a consistent color palette for tiles.
+
+game/tetromino.h/.cpp
+
+Defines tetromino types & rotations:
+
+7 standard Tetris pieces: I, O, T, S, Z, J, L.
+
+Representation:
+
+Piece shape as 4×4 matrix or list of relative coordinates.
+
+Functions:
+
+TetrominoType getRandomPieceType();
+
+Tetromino createTetromino(TetrominoType type);
+
+void rotateLeft(Tetromino& t);
+
+void rotateRight(Tetromino& t);
+
+Include wall-kick logic or simple collision-based rotation fallback.
+
+game/game_state.h/.cpp
+
+Holds full game state:
+
+Playfield grid: 10×20 array (plus hidden rows as needed).
+
+Current piece (type, position, rotation).
+
+Next piece.
+
+Line clear counter.
+
+Level (level = floor(linesCleared / 20)).
+
+Game status: playing, paused, game over.
+
+Functions:
+
+void initGame(GameState& s);
+
+bool spawnNewPiece(GameState& s); (returns false if spawn collision → game over).
+
+bool movePieceLeft(GameState& s);
+
+bool movePieceRight(GameState& s);
+
+bool softDrop(GameState& s); (optional).
+
+void hardDrop(GameState& s); (place piece at lowest valid position, lock it).
+
+bool rotatePieceLeft(GameState& s);
+
+bool stepGravity(GameState& s); (move down, place and clear lines if collision).
+
+int clearCompletedLines(GameState& s); (returns number of lines cleared).
+
+Update level & speed when line clear count crosses multiples of 20.
+
+game/input.h/.cpp
+
+Debouncing and input state management.
+
+Functions:
+
+void inputInit();
+
+void inputPoll(); (if polling-based).
+
+Provides a struct, e.g.:
+
+struct InputState {
+  bool pausePressed;
+  bool rotatePressed;
+  bool rightPressed;
+  bool leftPressed;
+  bool hardDropPressed;
+};
+
+
+InputState getInputState(); or event-based flags.
+
+Map button presses to logical actions, handle edge detection (pressed vs held).
+
+audio/audio.h/.cpp
+
+Initializes I2S and audio hardware.
+
+Manages a queue of sound events:
+
+enum SoundEvent {
+  SOUND_ROTATE,
+  SOUND_PLACE,
+  SOUND_LINE_CLEAR,
+  SOUND_LEVEL_UP,
+  SOUND_GAME_OVER
+};
+
+
+Functions:
+
+void audioInit();
+
+void audioTask(void* pvParameters); (FreeRTOS task entry).
+
+void enqueueSound(SoundEvent event);
+
+Each sound event:
+
+Generates tone or short sequence (simple chiptune-like effects).
+
+Uses sample rate (e.g., 22050 Hz or 44100 Hz).
+
+Streams to I2S using DMA-friendly buffers.
+
+system/tasks.h/.cpp
+
+Creates and manages FreeRTOS tasks.
+
+Functions:
+
+void createSystemTasks();
+
+Defines:
+
+Game task function.
+
+Optional separate display task.
+
+Audio task function.
+
+Input polling task (if separate).
+
+util/timer.h/.cpp
+
+Small helper for millis-based timing:
+
+class SimpleTimer with start(), expired(intervalMs), etc.
+
+Used by game loop to control gravity speed and flicker-timed animations.
+
+6. Game Logic & Mechanics
+6.1 Playfield
+
+Grid: 10 columns × 20 rows visible.
+
+Optionally maintain 1–2 hidden rows at top to simplify spawn and collision logic.
+
+Each cell stores:
+
+Empty or occupied.
+
+Color index or 16-bit RGB565 color.
+
+6.2 Tetromino Rules
+
+Standard 7-piece Tetris set (I, O, T, S, Z, J, L).
+
+Random piece selection (simple random; no need for “bag” randomizer for first version).
+
+Rotation:
+
+Rotate around piece center using pre-defined rotation states.
+
+On rotation, if collision with wall/blocks:
+
+Option 1: simple revert (no rotation).
+
+Option 2: basic wall-kick: try shifting ±1 horizontally before giving up.
+
+6.3 Gravity & Movement
+
+Gravity: piece automatically moves down every gravityIntervalMs based on the current level:
+
+Level 0: slower (e.g., 800 ms).
+
+Higher levels: reduce interval progressively (e.g., 50–100 ms per level to a minimum threshold).
+
+Movement:
+
+Left/right movement via button presses.
+
+Hard drop:
+
+On press, move piece down until collision, then step back one row and place immediately.
+
+Trigger place sound, then line clear check.
+
+6.4 Line Clearing & Levels
+
+After piece placement:
+
+Scan playfield for fully occupied rows.
+
+Remove those rows, shift above rows down.
+
+Maintain:
+
+totalLinesCleared integer.
+
+level = totalLinesCleared / 20 (integer division).
+
+On crossing each multiple of 20:
+
+Level increments.
+
+Trigger SOUND_LEVEL_UP.
+
+Adjust gravity interval accordingly.
+
+6.5 Scoring (Optional but recommended)
+
+Provide scoring but not required by user; keep minimal:
+
+1 line: +100
+
+2 lines: +300
+
+3 lines: +500
+
+4 lines: +800
+
+Show score on screen if implemented.
+
+6.6 Game States
+
+PLAYING
+
+PAUSED
+
+GAME_OVER
+
+Transitions:
+
+PLAYING → PAUSED on pause button press.
+
+PAUSED → PLAYING on pause button press again.
+
+PLAYING → GAME_OVER if new piece cannot spawn (collision on spawn).
+
+From GAME_OVER, pressing pause/hard drop could restart game (define restart rule clearly when coding).
+
+7. Input Handling
+7.1 Button Mapping
+
+Pause (Button A):
+
+Short press toggles PAUSE/RESUME.
+
+Ignored in GAME_OVER until restart behavior defined.
+
+Rotate Left (Button B):
+
+On edge trigger (press), rotate current piece left.
+
+Trigger SOUND_ROTATE.
+
+Rotate Right (Button C):
+
+On edge trigger (press), rotate current piece right.
+
+Trigger SOUND_ROTATE.
+
+Hard Drop (Button D):
+
+On edge trigger (press), immediately drop current piece to lowest valid position.
+
+Trigger placement sound and any line clear sounds after processing.
+
+7.2 Debouncing
+
+Use software debouncing:
+
+Sample each button every few ms (e.g., 5–10 ms).
+
+Use state machine or Bounce2 library.
+
+Expose HIGH-level events (pressed) to game logic, not raw pin levels.
+
+8. Display & Graphics
+8.1 Layout
+
+Screen: 320×240 pixels.
+
+Use portrait or landscape as preferred; PRD assumes portrait (240 width × 320 height).
+
+Proposed layout:
+
+Left side: Playfield area.
+
+Grid width = 10 columns.
+
+Choose tile size (e.g., 10–16 pixels) to fit.
+
+Right side: UI panel:
+
+Display:
+
+Next piece (small preview grid).
+
+Level number.
+
+Lines cleared (or level progress).
+
+Example:
+
+Tile size: 10 px.
+
+Playfield width: 10 × 10 = 100 px.
+
+Playfield height: 20 × 10 = 200 px.
+
+Offset with margins to center vertically.
+
+8.2 Colors
+
+Use 16-bit RGB565 colors.
+
+Assign each tetromino type a distinct color:
+
+I: Cyan
+
+O: Yellow
+
+T: Purple
+
+S: Green
+
+Z: Red
+
+J: Blue
+
+L: Orange
+
+Background color: dark (e.g., near-black or dark blue).
+
+Grid lines: optional; minimal to save draw time.
+
+8.3 Rendering Strategy
+
+Maintain an internal buffer of the playfield state (not full pixel buffer).
+
+Draw only changed cells:
+
+After each game tick, compare previous and current playfield plus current piece positions.
+
+Redraw cells that changed from empty→filled or filled→empty.
+
+Next piece preview:
+
+Redraw only when next piece changes.
+
+8.4 UI Elements
+
+Level display: Level: X
+
+Lines cleared: Lines: Y
+
+Optionally draw a simple progress bar for lines to next level (Y mod 20).
+
+8.5 Special Screens
+
+Pause Overlay:
+
+Semi-transparent overlay (or just text “PAUSED”) centered over playfield.
+
+Game Over Screen:
+
+Text: “GAME OVER”.
+
+Optionally show final level/lines.
+
+Indicate how to restart (e.g., “Press Pause to Restart”).
+
+9. Audio Behavior
+9.1 I2S Setup
+
+Sample rate: 22050 Hz or 44100 Hz (configurable in config.h).
+
+Mono output.
+
+16-bit signed PCM.
+
+Use ESP32 I2S peripheral in TX mode only.
+
+9.2 Sound Events
+
+Define sounds for:
+
+Piece Rotation
+
+Short, subtle blip.
+
+Piece Placement
+
+Slightly stronger “thud” or tone.
+
+Row(s) Completed
+
+Rising short arpeggio or chord.
+
+New Level Achieved
+
+Distinct, upbeat jingle (slightly longer).
+
+Game Lost (Game Over)
+
+Descending tone or “sad” arpeggio.
+
+9.3 Implementation Notes
+
+For each SoundEvent, predefine:
+
+Sequence of frequencies & durations for simple tone synthesis, OR
+
+Precomputed short PCM arrays stored in PROGMEM.
+
+Audio task:
+
+Non-blocking: generate samples in chunks and push to I2S.
+
+Maintain a queue: multiple requests can be enqueued; handle them sequentially.
+
+Volume is controlled by analog stage (MAX98357A); software may avoid clipping by limiting amplitude.
+
+10. Timing & Performance
+
+Game tick (gravity step) controlled via SimpleTimer using millis().
+
+Render updates must fit within time budget to keep gameplay responsive.
+
+Button input polling frequency: 100–200 Hz (5–10 ms interval) for good responsiveness.
+
+11. Configuration Parameters (in config.h)
+
+Include tunable constants such as:
+
+const int PLAYFIELD_WIDTH = 10;
+
+const int PLAYFIELD_HEIGHT = 20;
+
+const int LINES_PER_LEVEL = 20;
+
+Gravity intervals per level (array or function).
+
+Audio:
+
+SAMPLE_RATE
+
+AUDIO_BUFFER_SIZE
+
+Graphics:
+
+CELL_SIZE_PIXELS
+
+Screen offsets for playfield and UI panel.
+
+Pin assignments (possibly cross-include from hardware_pins.h).
+
+12. Debugging & Testing
+
+Optional but useful:
+
+Serial debug logging:
+
+Game state transitions (pause, resume, game over).
+
+Line clears, level ups.
+
+Button presses state.
+
+Test mode:
+
+Simple routine to fill playfield with colors to test TFT.
+
+Audio test function to play all sounds in sequence.
+
+13. Definition of Done (for Coding Phase)
+
+The implementation can be declared “done” when:
+
+Hardware wired per pin mapping, with:
+
+TFT showing graphics.
+
+Buttons correctly detected and debounced.
+
+Sound clearly audible via MAX98357A and speaker.
+
+Game runs on ESP32:
+
+Pieces spawn in the playfield, fall with gravity.
+
+Player can:
+
+Pause/resume.
+
+Rotate pieces left/right.
+
+Hard drop pieces.
+
+Next piece preview is visible.
+
+Level and total lines cleared are displayed and updated.
+
+Every 20 lines, level increments and gravity speeds up.
+
+Sounds play:
+
+On rotation, placement, line clear, level up, and game over.
+
+No crashes or severe audio glitches.
+
+Code organization:
+
+Matches the multi-file hierarchy and module boundaries specified above.
+
+Compiles under PlatformIO with Arduino framework for ESP32 without warnings (or minimal, documented ones).

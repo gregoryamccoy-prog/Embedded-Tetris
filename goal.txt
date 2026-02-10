@@ -1,0 +1,15 @@
+You are a skilled embedded system engineer.  You are knowledgeable in ESP32 Development and Graphics programming with the ILI9431 TFT LCD driver.
+We are "only" creating the project requirements document here.  Please decompose the following tasks well-enough to feed to an LLM for coding.  Detail is appreciated.
+
+The goal is to create a Tetris game using a standard ESP32 WROOM device, a TFT LCD display with the ILI9431 driver, four momentary push buttons, a MAX98357A I2S amplifier and, a 0.5W 8 Ohm 28mm speaker,
+I will need a wiring diagram.  The ESP32 code will be in Arduino C++ and compatible with the Platform I/O extension of VS Code.  I will not need Bluetooth nor Wifi, so both cores of the ESP32 may be used.  I would like the code to be spread across several files grouped accoring to specific scopes, i.e. don't create one pile of code in a single file. Please specify a file heirarchy.
+
+The four buttons will control (a) Pause for the game (b) left rotation of pieces (c) right rotation of pieces and (d) immediate descent of the current piece.
+
+The tetris game show show the next piece waiting, along with the numbers of levels completed.  Each removal of 20 rows is a level completed.  Full normal color tiles should be supported.
+
+The game should support sounds typical of a tetris game:  A sound for piece rotation, piece placement, rows completed, a new level acheived, and loss of the game.  The sound should feed into the MAX98357A using I2S.
+
+The TFT disaply communication should use SPI.
+
+Use any libraries you believe are needed.
