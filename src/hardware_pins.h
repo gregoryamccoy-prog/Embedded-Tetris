@@ -23,4 +23,9 @@
 #define BTN_LEFT_PIN         14  // Button D - Translate Left
 #define BTN_HARD_DROP_PIN    13  // Button E - Hard Drop
 
+// Joystick Pins (Analog 2-Axis + Switch)
+#define JOYSTICK_X_PIN       34  // ADC1 - X axis (horizontal)
+#define JOYSTICK_Y_PIN       35  // ADC1 - Y axis (vertical)
+#define JOYSTICK_SW_PIN      21  // Button - Active Low with Pull-Up
+
 #endif // HARDWARE_PINS_H

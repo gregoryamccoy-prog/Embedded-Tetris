@@ -877,3 +877,111 @@ Code organization:
 Matches the multi-file hierarchy and module boundaries specified above.
 
 Compiles under PlatformIO with Arduino framework for ESP32 without warnings (or minimal, documented ones).
+
+14. Additional Input Device — Analog Joystick
+
+14.1 Purpose
+
+An analog 2-axis joystick with integrated momentary switch shall be added as an
+additional control device. The existing five push buttons remain fully functional
+and unchanged. The joystick provides redundant and continuous control mapped to
+the same in-game actions.
+
+14.2 Electrical Interface & Pin Assignment
+
+The joystick module provides:
+
+- X axis: analog voltage via potentiometer
+- Y axis: analog voltage via potentiometer
+- SW: momentary push button (active low)
+
+Pin assignment (must not modify any existing wiring):
+
+Function            ESP32 Pin   Notes
+JOYSTICK_X          GPIO34      ADC1 input, input-only, no pull-up
+JOYSTICK_Y          GPIO35      ADC1 input, input-only, no pull-up
+
+Power:
+
+Joystick VCC → 3.3V  
+Joystick GND → GND
+
+14.3 Updated Wiring Table (Additive)
+
+╔═══════════════════════════════════════════════════════════════════════╗
+║ JOYSTICK (Analog) │ FUNCTION        │ ESP32 PIN    │ NOTES           ║
+╠═══════════════════════════════════════════════════════════════════════╣
+║                   │ VCC             │ 3.3V         │ Power           ║
+║                   │ GND             │ GND          │ Ground          ║
+║                   │ X AXIS          │ GPIO34       │ ADC1            ║
+║                   │ Y AXIS          │ GPIO35       │ ADC1            ║
+╚═══════════════════════════════════════════════════════════════════════╝
+
+14.4 Logical Control Mapping
+
+Joystick input generates the same logical actions as the push buttons:
+
+UP            → Rotate tetromino
+LEFT          → Move left
+RIGHT         → Move right
+DOWN          → Hard drop
+
+
+14.5 Analog Interpretation
+
+Centered value ≈ mid-scale ADC reading.
+
+Define a dead-zone around center to prevent drift.
+
+Movement regions per axis:
+
+CENTER ZONE:
+No action generated.
+
+SMALL DEFLECTION:
+Generate a single movement event on entry into the zone.
+
+LARGE DEFLECTION:
+Generate repeated movement events at fixed interval.
+
+14.6 Horizontal Movement Behavior
+
+Small left/right deflection:
+- Move exactly one grid cell per entry into the zone.
+
+Large left/right deflection:
+- Auto-repeat horizontal movement.
+- Repeat interval: 500 ms.
+
+This auto-repeat is independent of gravity timing.
+
+14.7 Vertical Movement Behavior
+
+Upward deflection beyond threshold:
+- Trigger rotate (edge-triggered, no auto-repeat).
+
+Downward deflection beyond threshold:
+- Trigger hard drop immediately.
+
+14.8 Software Implementation Notes
+
+- Use ADC1 for both axes to avoid Wi-Fi/BT conflicts (even though radios are disabled).
+- Sample rate for joystick: 100–200 Hz.
+- Apply simple smoothing (moving average or median of last N samples).
+- Convert analog values into digital action events in input module.
+- Merge joystick-generated actions with button-generated actions into the same
+  InputState structure so the game logic remains unchanged.
+
+14.9 Input Priority
+
+If both joystick and button request the same action simultaneously,
+they are treated identically. No special priority is required.
+
+14.10 Calibration Constants (config.h)
+
+Define:
+
+JOYSTICK_DEADZONE
+JOYSTICK_SMALL_THRESHOLD
+JOYSTICK_LARGE_THRESHOLD
+JOYSTICK_REPEAT_INTERVAL_MS = 500

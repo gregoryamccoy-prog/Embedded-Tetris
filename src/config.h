@@ -29,6 +29,15 @@ inline unsigned long getGravityInterval(int level) {
 // Input polling
 constexpr unsigned long INPUT_POLL_INTERVAL_MS = 10;  // 100 Hz
 
+// Joystick Configuration
+constexpr int JOYSTICK_CENTER_VALUE = 2048;           // 12-bit ADC center (0-4095)
+constexpr int JOYSTICK_DEADZONE = 600;                 // Dead zone around center
+constexpr int JOYSTICK_SMALL_THRESHOLD = 1024;         // Small deflection threshold
+constexpr int JOYSTICK_LARGE_THRESHOLD = 1536;         // Large deflection threshold
+constexpr unsigned long JOYSTICK_REPEAT_INTERVAL_MS = 250;  // Auto-repeat for large deflection
+constexpr int JOYSTICK_SMOOTHING_SAMPLES = 3;          // Number of samples to average
+constexpr unsigned long JOYSTICK_Y_LOCKOUT_MS = 50;    // Lockout period after Y-axis action
+
 // ============================================================================
 // GRAPHICS CONFIGURATION
 // ============================================================================

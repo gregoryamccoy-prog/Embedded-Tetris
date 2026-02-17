@@ -41,14 +41,15 @@ void Display::init() {
     tft.setCursor(UI_PANEL_X, UI_PANEL_Y - 15);
     tft.print("NEXT:");
     
-    tft.setCursor(UI_PANEL_X, UI_PANEL_Y + 60);
-    tft.print("LEVEL:");
+    tft.setTextSize(2);
+    tft.setCursor(UI_PANEL_X, UI_PANEL_Y + 65);
+    tft.print("LEVEL");
     
-    tft.setCursor(UI_PANEL_X, UI_PANEL_Y + 90);
-    tft.print("LINES:");
+    tft.setCursor(UI_PANEL_X, UI_PANEL_Y + 125);
+    tft.print("LINES");
     
-    tft.setCursor(UI_PANEL_X, UI_PANEL_Y + 120);
-    tft.print("SCORE:");
+    tft.setCursor(UI_PANEL_X, UI_PANEL_Y + 185);
+    tft.print("SCORE");
 }
 
 void Display::clearScreen() {
@@ -171,28 +172,28 @@ void Display::drawNextPiece(const Tetromino& next) {
 
 void Display::drawStats(int level, int linesCleared, unsigned long score) {
     tft.setTextColor(COLOR_WHITE, COLOR_BACKGROUND);
-    tft.setTextSize(1);
+    tft.setTextSize(3);
     
     // Only update level if changed
     if (level != prevLevel) {
-        tft.setCursor(UI_PANEL_X, UI_PANEL_Y + 75);
-        tft.fillRect(UI_PANEL_X, UI_PANEL_Y + 75, 60, 10, COLOR_BACKGROUND);
+        tft.setCursor(UI_PANEL_X, UI_PANEL_Y + 88);
+        tft.fillRect(UI_PANEL_X, UI_PANEL_Y + 88, 80, 24, COLOR_BACKGROUND);
         tft.print(level);
         prevLevel = level;
     }
     
     // Only update lines if changed
     if (linesCleared != prevLinesCleared) {
-        tft.setCursor(UI_PANEL_X, UI_PANEL_Y + 105);
-        tft.fillRect(UI_PANEL_X, UI_PANEL_Y + 105, 60, 10, COLOR_BACKGROUND);
+        tft.setCursor(UI_PANEL_X, UI_PANEL_Y + 148);
+        tft.fillRect(UI_PANEL_X, UI_PANEL_Y + 148, 80, 24, COLOR_BACKGROUND);
         tft.print(linesCleared);
         prevLinesCleared = linesCleared;
     }
     
     // Only update score if changed
     if (score != prevScore) {
-        tft.setCursor(UI_PANEL_X, UI_PANEL_Y + 135);
-        tft.fillRect(UI_PANEL_X, UI_PANEL_Y + 135, 60, 10, COLOR_BACKGROUND);
+        tft.setCursor(UI_PANEL_X, UI_PANEL_Y + 208);
+        tft.fillRect(UI_PANEL_X, UI_PANEL_Y + 208, 80, 24, COLOR_BACKGROUND);
         tft.print(score);
         prevScore = score;
     }
