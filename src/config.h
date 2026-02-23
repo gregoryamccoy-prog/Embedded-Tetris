@@ -13,7 +13,7 @@ constexpr int PLAYFIELD_HEIGHT = 20;
 constexpr int PLAYFIELD_HIDDEN_ROWS = 2;  // Extra rows at top for spawning
 
 // Level progression
-constexpr int LINES_PER_LEVEL = 20;
+constexpr int LINES_PER_LEVEL = 10;
 
 // Gravity timing (milliseconds per drop at each level)
 // Decreases as level increases for faster gameplay
@@ -85,14 +85,41 @@ constexpr int AUDIO_BUFFER_SIZE = 512;     // Samples per buffer
 constexpr int AUDIO_QUEUE_SIZE = 10;       // Max queued sound events
 
 // Sound durations (in samples)
-constexpr int SOUND_DURATION_ROTATE = SAMPLE_RATE / 20;      // ~50ms
-constexpr int SOUND_DURATION_PLACE = SAMPLE_RATE / 10;       // ~100ms
-constexpr int SOUND_DURATION_LINE_CLEAR = SAMPLE_RATE / 5;   // ~200ms
-constexpr int SOUND_DURATION_LEVEL_UP = SAMPLE_RATE / 3;     // ~333ms
-constexpr int SOUND_DURATION_GAME_OVER = SAMPLE_RATE / 2;    // ~500ms
+constexpr int SOUND_DURATION_ROTATE     = SAMPLE_RATE / 20;          // ~50ms
+constexpr int SOUND_DURATION_PLACE      = SAMPLE_RATE / 10;          // ~100ms
+constexpr int SOUND_DURATION_LINE_CLEAR_1 = SAMPLE_RATE / 5;         // ~200ms  single line
+constexpr int SOUND_DURATION_LINE_CLEAR_2 = SAMPLE_RATE * 3 / 10;    // ~300ms  double
+constexpr int SOUND_DURATION_LINE_CLEAR_3 = SAMPLE_RATE * 9 / 20;    // ~450ms  triple
+constexpr int SOUND_DURATION_LINE_CLEAR_4 = SAMPLE_RATE * 13 / 20;   // ~650ms  Tetris!
+constexpr int SOUND_DURATION_LEVEL_UP   = SAMPLE_RATE / 3;           // ~333ms
+constexpr int SOUND_DURATION_GAME_OVER  = SAMPLE_RATE / 2;           // ~500ms
 
 // Sound volume (amplitude, 0-32767)
 constexpr int16_t SOUND_VOLUME = 16000;
+
+// Background music volume (quieter than SFX so effects punch through)
+constexpr int16_t MUSIC_VOLUME = 5000;
+
+// Background music BPM (Tetris Theme A – Korobeiniki, gameboy speed)
+constexpr float MUSIC_BPM = 149.0f;
+
+// Note durations in samples at MUSIC_BPM and SAMPLE_RATE
+constexpr int MUSIC_NOTE_Q  = (int)(SAMPLE_RATE * 60.0f / MUSIC_BPM);   // quarter
+constexpr int MUSIC_NOTE_E  = MUSIC_NOTE_Q / 2;                          // eighth
+constexpr int MUSIC_NOTE_DQ = MUSIC_NOTE_Q * 3 / 2;                      // dotted quarter
+constexpr int MUSIC_NOTE_H  = MUSIC_NOTE_Q * 2;                          // half
+
+// Background music – Theme B (Tetris Theme C / Bach Menuet BWV 814, A major, 3/4, 100 BPM)
+constexpr float MUSIC_BPM_B    = 100.0f;
+constexpr int MUSIC_B_NOTE_Q   = (int)(SAMPLE_RATE * 60.0f / MUSIC_BPM_B);  // quarter  (~600 ms)
+constexpr int MUSIC_B_NOTE_H   = MUSIC_B_NOTE_Q * 2;                         // half     (~1200 ms)
+constexpr int MUSIC_B_NOTE_DH  = MUSIC_B_NOTE_Q * 3;                         // dotted half = one full 3/4 bar
+
+// Lines cleared between music track switches (A→B→A→ ... every 10 lines)
+constexpr int MUSIC_TRACK_SWITCH_LINES = 10;
+
+// Fraction of each note that is silent (articulation gap, 0.0–1.0)
+constexpr float NOTE_GAP_RATIO = 0.08f;
 
 // ============================================================================
 // FREERTOS CONFIGURATION

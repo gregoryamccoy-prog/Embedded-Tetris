@@ -4,9 +4,9 @@
 
 ## Project Overview
 Complete ESP32-based Tetris game with:
-- **Hardware**: ESP32-WROOM, 320×240 ILI9341/ILI9431 TFT (SPI), MAX98357A I2S audio, 4 buttons
+- **Hardware**: ESP32-WROOM, 320×240 ILI9341/ILI9431 TFT (SPI), MAX98357A I2S audio, 5 buttons + analog joystick
 - **Software**: Arduino C++ (PlatformIO), multi-core FreeRTOS, modular architecture
-- **Features**: Standard Tetris gameplay, level progression (20 lines/level), sound effects, next-piece preview
+- **Features**: Standard Tetris gameplay, level progression (20 lines/level), sound effects, background music, next-piece preview, dual input (buttons + joystick)
 
 ---
 
@@ -39,16 +39,22 @@ All phases have been successfully implemented:
 
 ### Phase 4: Input System ✅
 - ✅ Implemented `input.h/cpp` with Bounce2 debouncing:
-  - 4 button inputs with edge detection
+  - 5 button inputs with edge detection (Pause, Rotate, Right, Left, Hard Drop)
   - Active-low configuration with pull-ups
   - 10ms debounce timing
+  - Analog joystick on GPIO34 (X) / GPIO35 (Y) with ADC1
+  - Dead-zone, small/large deflection zones, auto-repeat for horizontal movement
+  - Joystick actions merged into shared `InputState` (game logic unchanged)
 
 ### Phase 5: Audio System ✅
 - ✅ Implemented `audio.h/cpp` with I2S audio:
-  - Queue-based sound event system
-  - 5 sound effects (rotate, place, line clear, level up, game over)
-  - Real-time tone synthesis
-  - Non-blocking audio playback
+  - Queue-based sound effect event system (rotate, place, line clear, level up, game over)
+  - Real-time sine-wave tone synthesis
+  - Non-blocking sound effect playback
+  - **Background music**: Tetris Theme A (Korobeiniki) — 77-note melody table at 149 BPM, full AABB structure (16 measures), loops continuously during gameplay
+  - Music pauses/resumes with the game pause toggle
+  - Music stops and game-over SFX plays when the game ends
+  - I2S DMA pipeline kept continuously primed (silence written when music is off)
 
 ### Phase 6: Timing Utilities ✅
 - ✅ Implemented `timer.h` with SimpleTimer class
@@ -120,8 +126,15 @@ EmbeddedTetris/
 ### Buttons (Active Low with Pull-Up)
 - Pause: GPIO32
 - Rotate Left: GPIO33
-- Rotate Right: GPIO27
-- Hard Drop: GPIO14
+- Translate Right: GPIO27
+- Translate Left: GPIO14
+- Hard Drop: GPIO13
+
+### Analog Joystick
+- X Axis: GPIO34 (ADC1)
+- Y Axis: GPIO35 (ADC1)
+- VCC: 3.3V, GND: GND
+- UP → Rotate, LEFT → Move Left, RIGHT → Move Right, DOWN → Hard Drop
 
 ---
 
@@ -147,16 +160,21 @@ EmbeddedTetris/
 - ✅ Game over screen
 
 ### Audio
-- ✅ 5 distinct sound effects
-- ✅ Non-blocking I2S playback
-- ✅ Queue-based event system
-- ✅ Real-time tone synthesis
+- ✅ 5 distinct sound effects (rotate, place, line clear, level up, game over)
+- ✅ Background music: Tetris Theme A (Korobeiniki) looping at 149 BPM
+- ✅ Music pause/resume tied to game pause state
+- ✅ Music stops on game over; SFX still plays
+- ✅ Non-blocking I2S playback; DMA pipeline continuously fed
+- ✅ Queue-based sound effect event system
+- ✅ Real-time sine-wave tone synthesis
+- ✅ Separate configurable volumes for SFX (`SOUND_VOLUME`) and music (`MUSIC_VOLUME`)
 
 ### Architecture
 - ✅ Multi-core FreeRTOS design
 - ✅ Modular file organization
 - ✅ Clear separation of concerns
 - ✅ Efficient inter-task communication
+- ✅ Dual input path (5 buttons + analog joystick) merged into single `InputState`
 
 ---
 
@@ -257,12 +275,15 @@ pio device monitor
 - [ ] Game over triggers on spawn collision
 
 ### Audio ✅
-- [ ] Rotate sound plays on rotation
-- [ ] Place sound plays on piece lock
-- [ ] Line clear sound plays when lines removed
-- [ ] Level up sound plays on level increment
-- [ ] Game over sound plays on loss
-- [ ] No audio glitches or blocking
+- [x] Rotate sound plays on rotation
+- [x] Place sound plays on piece lock
+- [x] Line clear sound plays when lines removed
+- [x] Level up sound plays on level increment
+- [x] Game over sound plays on loss
+- [x] Background music (Tetris Theme A) plays continuously during gameplay
+- [x] Music pauses when game is paused and resumes when unpaused
+- [x] Music stops cleanly on game over
+- [x] No audio glitches or blocking
 
 ### UI ✅
 - [ ] Level number displayed and updates
@@ -283,23 +304,23 @@ pio device monitor
 
 **Total Files Created: 17**
 
-1. `platformio.ini` - Project configuration
-2. `src/hardware_pins.h` - GPIO pin definitions
-3. `src/config.h` - Game configuration constants
-4. `src/util/timer.h` - Timing utility
-5. `src/game/tetromino.h` - Tetromino definitions
-6. `src/game/tetromino.cpp` - Tetromino implementation
-7. `src/game/game_state.h` - Game state definitions
-8. `src/game/game_state.cpp` - Game logic implementation
-9. `src/display/display.h` - Display interface
-10. `src/display/display.cpp` - Display implementation
-11. `src/game/input.h` - Input interface
-12. `src/game/input.cpp` - Input implementation
-13. `src/audio/audio.h` - Audio interface
-14. `src/audio/audio.cpp` - Audio implementation
-15. `src/system/tasks.h` - Task definitions
-16. `src/system/tasks.cpp` - Task implementation
-17. `src/main.cpp` - Main entry point
+1. `platformio.ini` — Project configuration
+2. `src/hardware_pins.h` — GPIO pin definitions (TFT, I2S, buttons, joystick)
+3. `src/config.h` — Game configuration constants (game, graphics, audio, FreeRTOS, joystick, music BPM/volumes)
+4. `src/util/timer.h` — Timing utility (SimpleTimer)
+5. `src/game/tetromino.h` — Tetromino type definitions and rotation tables
+6. `src/game/tetromino.cpp` — Tetromino implementation
+7. `src/game/game_state.h` — Game state definitions
+8. `src/game/game_state.cpp` — Game logic implementation
+9. `src/display/display.h` — Display interface
+10. `src/display/display.cpp` — Display implementation
+11. `src/game/input.h` — Input interface (buttons + joystick)
+12. `src/game/input.cpp` — Input implementation with Bounce2 + ADC joystick
+13. `src/audio/audio.h` — Audio interface (SFX queue + music control API)
+14. `src/audio/audio.cpp` — Audio implementation (tone synthesis, Tetris Theme A melody table, music engine)
+15. `src/system/tasks.h` — Task definitions
+16. `src/system/tasks.cpp` — Task implementation (music start/stop/pause/resume wired to game events)
+17. `src/main.cpp` — Main entry point
 
 **Total Lines of Code: ~1500+**
 

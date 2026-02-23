@@ -985,3 +985,75 @@ JOYSTICK_DEADZONE
 JOYSTICK_SMALL_THRESHOLD
 JOYSTICK_LARGE_THRESHOLD
 JOYSTICK_REPEAT_INTERVAL_MS = 500
+
+15. Background Music
+
+15.1 Overview
+
+A continuously looping background music track shall play during active gameplay.
+The melody is Tetris Theme A (Korobeiniki), the classic Gameboy version, matching
+the score at https://musescore.com/user/46143110/scores/12273445
+
+15.2 Melody Specification
+
+Piece:   Tetris Theme A (Korobeiniki) — Gameboy arrangement
+Key:     A minor / C major
+BPM:     149
+Structure: AABB (Part A × 2, Part B × 2) — 16 measures, 77 notes total
+Duration per loop: ~1 minute 4 seconds at 149 BPM
+
+Note table (frequency / duration pairs) stored as a static const array of
+MusicNote structs in audio.cpp.  The melody loops seamlessly at end.
+
+15.3 Timing
+
+Note durations are derived at compile-time from BPM and sample rate:
+
+Quarter note (Q)  = SAMPLE_RATE × 60 / BPM  samples
+Eighth  note (E)  = Q / 2
+Dotted quarter (DQ) = Q × 3 / 2
+Half note (H)     = Q × 2
+
+An articulation gap of 8 % (NOTE_GAP_RATIO = 0.08) is silenced at the end of
+each note to clearly separate consecutive identical pitches.
+
+15.4 Audio Engine
+
+The audio task generates music in chunks of AUDIO_BUFFER_SIZE samples per call
+to advanceMusicChunk(), which is invoked every processAudio() cycle.
+
+Sound effects (SFX) interrupt the music stream briefly: one queued SFX is
+processed to I2S before the music chunk is written.  Since SFX durations are
+short (50–500 ms), the music resumes with negligible audible gap.
+
+When music is paused or disabled, silence buffers are written to keep the I2S
+DMA pipeline primed.
+
+15.5 Volume
+
+MUSIC_VOLUME = 5000  (amplitude, 0–32767)   ~30% of SOUND_VOLUME (16000)
+
+This balance ensures game sound effects remain clearly audible above the music.
+
+15.6 Music Control API (audio.h)
+
+void startMusic();   // Reset to beginning and begin playback
+void stopMusic();    // Silence; called on game over
+void pauseMusic();   // Freeze position; called when game is paused
+void resumeMusic();  // Continue from frozen position; called on unpause
+
+15.7 Game Integration (tasks.cpp)
+
+Event                  Action
+Game task starts     → audioManager.startMusic()
+Player pauses game   → audioManager.pauseMusic()
+Player unpauses game → audioManager.resumeMusic()
+Game over detected   → audioManager.stopMusic(); enqueueSound(SOUND_GAME_OVER)
+
+15.8 Configuration Constants (config.h)
+
+MUSIC_VOLUME          — amplitude for music synthesis (default 5000)
+MUSIC_BPM             — tempo (default 149.0f)
+MUSIC_NOTE_Q/E/DQ/H   — compile-time sample counts per note duration
+NOTE_GAP_RATIO        — articulation silence fraction per note (default 0.08f)
+

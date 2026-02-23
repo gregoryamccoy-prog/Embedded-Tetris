@@ -9,6 +9,14 @@ GameState gameState;
 Display display;
 InputManager inputManager;
 
+// Returns the appropriate line-clear SFX event for the number of rows cleared
+static SoundEvent lineClearSfx(int delta) {
+    if (delta >= 4) return SoundEvent::SOUND_LINE_CLEAR_4;
+    if (delta == 3) return SoundEvent::SOUND_LINE_CLEAR_3;
+    if (delta == 2) return SoundEvent::SOUND_LINE_CLEAR_2;
+    return SoundEvent::SOUND_LINE_CLEAR_1;
+}
+
 void gameTask(void* pvParameters) {
     Serial.println("Game task started on core " + String(xPortGetCoreID()));
     
@@ -22,7 +30,14 @@ void gameTask(void* pvParameters) {
     
     // Track if display needs update
     bool needsDisplayUpdate = false;
-    
+
+    // Start background music
+    audioManager.startMusic();
+
+    // Track line-clear & level totals for delta computation
+    int lastLinesCleared = 0;
+    int lastLevel        = 0;
+
     // Game loop
     while (true) {
         // Poll input at regular intervals
@@ -35,10 +50,12 @@ void gameTask(void* pvParameters) {
             // Handle pause button
             if (input.pausePressed) {
                 togglePause(gameState);
-                
+
                 if (gameState.status == GameStatus::PAUSED) {
+                    audioManager.pauseMusic();
                     display.drawPauseOverlay();
                 } else if (gameState.status == GameStatus::PLAYING) {
+                    audioManager.resumeMusic();
                     // Redraw when unpausing
                     display.fullRedraw(gameState);
                     needsDisplayUpdate = false;  // Already updated
@@ -71,33 +88,35 @@ void gameTask(void* pvParameters) {
                 
                 // Hard drop
                 if (input.hardDropPressed) {
+                    // Capture totals BEFORE the drop
+                    int linesBefore = gameState.linesCleared;
+                    int levelBefore = gameState.level;
+
                     hardDrop(gameState);
                     audioManager.enqueueSound(SoundEvent::SOUND_PLACE);
                     needsDisplayUpdate = true;
-                    
-                    // Check for line clears after drop
-                    if (gameState.linesCleared > 0) {
-                        int prevLines = gameState.linesCleared;
-                        int prevLevel = gameState.level;
-                        
-                        // Line clearing already happened in hardDrop->lockPiece
-                        // Just trigger sounds
-                        audioManager.enqueueSound(SoundEvent::SOUND_LINE_CLEAR);
-                        
-                        if (gameState.level > prevLevel) {
-                            audioManager.enqueueSound(SoundEvent::SOUND_LEVEL_UP);
-                        }
+
+                    int delta = gameState.linesCleared - linesBefore;
+                    if (delta > 0) {
+                        audioManager.enqueueSound(lineClearSfx(delta));
+                        lastLinesCleared = gameState.linesCleared;
+                        audioManager.setLinesCleared(gameState.linesCleared);
                     }
-                    
+                    if (gameState.level > levelBefore) {
+                        audioManager.enqueueSound(SoundEvent::SOUND_LEVEL_UP);
+                        lastLevel = gameState.level;
+                    }
+
                     // Check for game over
                     if (isGameOver(gameState)) {
+                        audioManager.stopMusic();
                         audioManager.enqueueSound(SoundEvent::SOUND_GAME_OVER);
                         display.drawGameOver(gameState);
                     }
                 }
             }
         }
-        
+
         // Handle gravity (only when playing)
         if (gameState.status == GameStatus::PLAYING) {
             unsigned long gravityInterval = getGravityInterval(gameState.level);
@@ -109,16 +128,13 @@ void gameTask(void* pvParameters) {
                 if (!moved) {
                     // Piece was locked
                     audioManager.enqueueSound(SoundEvent::SOUND_PLACE);
-                    
-                    // Check if lines were cleared in stepGravity
-                    static int lastLinesCleared = 0;
-                    static int lastLevel = 0;
-                    
-                    if (gameState.linesCleared > lastLinesCleared) {
-                        audioManager.enqueueSound(SoundEvent::SOUND_LINE_CLEAR);
+
+                    int delta = gameState.linesCleared - lastLinesCleared;
+                    if (delta > 0) {
+                        audioManager.enqueueSound(lineClearSfx(delta));
                         lastLinesCleared = gameState.linesCleared;
+                        audioManager.setLinesCleared(gameState.linesCleared);
                     }
-                    
                     if (gameState.level > lastLevel) {
                         audioManager.enqueueSound(SoundEvent::SOUND_LEVEL_UP);
                         lastLevel = gameState.level;
@@ -126,11 +142,12 @@ void gameTask(void* pvParameters) {
                     
                     // Check for game over
                     if (isGameOver(gameState)) {
+                        audioManager.stopMusic();
                         audioManager.enqueueSound(SoundEvent::SOUND_GAME_OVER);
                         display.drawGameOver(gameState);
                     }
                 }
-                
+
                 gravityTimer.reset();
             }
         }
